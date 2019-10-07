@@ -111,19 +111,23 @@ class DataGenerator(object):
         order_idx = list(range(N))
         all_image_batches_list, all_label_batches_list = [], []
         for _ in range(B):
-            random.shuffle(order_idx)
+            # random.shuffle(order_idx)
             train_classes = random.sample(folders, N)
-            label_image_path_tups = get_images(train_classes, train_classes, K, False)
-            one_hot_mat = np.eye(N)
-            one_hot_dict = dict(zip(train_classes, one_hot_mat))
-            labels_str_list = [t[0] for t in label_image_path_tups]
-            labels_oh_array = np.vstack([one_hot_dict[l] for l in labels_str_list])
-            image_path_list = [t[1] for t in label_image_path_tups]
+            label_image_path_tups = get_images(train_classes, np.eye(N), K, False)
+            new_indices = [np.arange(i, N * K, K) for i in range(K)]
+            for new_idx in new_indices:
+                np.random.shuffle(new_idx)
+            # pdb.set_trace()
+            # one_hot_mat = np.eye(N)
+            # one_hot_dict = dict(zip(train_classes, one_hot_mat))
+            # labels_str_list = [t[0] for t in label_image_path_tups]
+            labels_oh_array = np.vstack([label_image_path_tups[i][0] for new_idx in new_indices for i in new_idx])
+            image_path_list = [label_image_path_tups[i][1] for new_idx in new_indices for i in new_idx]
             images_flat = np.vstack([image_file_to_array(f, self.dim_input) for f in image_path_list])
             images_flat_re = images_flat.reshape([1, K, N, self.dim_input])
             labels_oh_array_re = labels_oh_array.reshape([1, K, N, self.dim_output])
-            all_image_batches_list.append(images_flat_re[:, :, order_idx, :])
-            all_label_batches_list.append(labels_oh_array_re[:, :, order_idx, :])
+            all_image_batches_list.append(images_flat_re)
+            all_label_batches_list.append(labels_oh_array_re)
 
         all_image_batches = np.vstack(all_image_batches_list)
         all_label_batches = np.vstack(all_label_batches_list)

@@ -5,6 +5,8 @@ from load_data import DataGenerator
 from tensorflow.python.platform import flags
 from tensorflow.keras import layers
 import ipdb as pdb
+import pandas as pd
+from collections import defaultdict
 
 FLAGS = flags.FLAGS
 
@@ -29,7 +31,7 @@ def loss_function(preds, labels):
     """
     #############################
     #### YOUR CODE GOES HERE ####
-    pdb.set_trace()
+    # pdb.set_trace()
     last_preds = preds[:, -1, :, :]
     last_labels = labels[:, -1, :, :]
     N = last_preds.get_shape().as_list()[-1]
@@ -60,7 +62,7 @@ class MANN(tf.keras.Model):
         """
         #############################
         #### YOUR CODE GOES HERE ####
-        pdb.set_trace()
+        # pdb.set_trace()
         label_list = tf.unstack(input_labels, axis=1)
         last_labs = tf.zeros_like(label_list[-1])
         label_list[-1] = last_labs
@@ -93,6 +95,8 @@ out = o(ims, labels)
 loss = loss_function(out, labels)
 optim = tf.train.AdamOptimizer(0.001)
 optimizer_step = optim.minimize(loss)
+ddict = defaultdict(list)
+outfile = "N_{}_K_{}_B_{}.csv".format(FLAGS.num_classes, FLAGS.num_samples, FLAGS.meta_batch_size)
 
 with tf.Session() as sess:
     sess.run(tf.local_variables_initializer())
@@ -111,11 +115,16 @@ with tf.Session() as sess:
                     labels: l.astype(np.float32)}
             pred, tls = sess.run([out, loss], feed)
             print("Train Loss:", ls, "Test Loss:", tls)
+            ddict['train_loss'].append(ls)
+            ddict['test_loss'].append(tls)
             pred = pred.reshape(
                 -1, FLAGS.num_samples + 1,
                 FLAGS.num_classes, FLAGS.num_classes)
             pred = pred[:, -1, :, :].argmax(2)
             l = l[:, -1, :, :].argmax(2)
             print("Test Accuracy", (1.0 * (pred == l)).mean())
+            ddict['test_acc'].append((1.0 * (pred == l)).mean())
 
-pdb.set_trace()
+df = pd.DataFrame(ddict)
+df.to_csv(outfile)
+# pdb.set_trace()
