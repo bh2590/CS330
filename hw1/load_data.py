@@ -77,7 +77,7 @@ class DataGenerator(object):
         random.shuffle(character_folders)
         num_val = 100
         num_train = 1100
-        pdb.set_trace()
+        # pdb.set_trace()
         self.metatrain_character_folders = character_folders[: num_train]
         self.metaval_character_folders = character_folders[
                                          num_train:num_train + num_val]
@@ -103,22 +103,31 @@ class DataGenerator(object):
 
         #############################
         #### YOUR CODE GOES HERE ####
-        pdb.set_trace()
+        # pdb.set_trace()
         B = batch_size
         K = self.num_samples_per_class
         N = self.num_classes
 
-        train_classes = random.sample(folders, N)
-        label_image_path_tups = get_images(train_classes, train_classes, K * B, False)
-        one_hot_mat = np.eye(N)
-        one_hot_dict = dict(zip(train_classes, one_hot_mat))
-        labels_str_list = [t[0] for t in label_image_path_tups]
-        labels_oh_array = np.vstack([one_hot_dict[l] for l in labels_str_list])
-        image_path_list = [t[1] for t in label_image_path_tups]
-        images_flat = np.vstack([image_file_to_array(f, self.dim_input) for f in image_path_list])
+        order_idx = list(range(N))
+        all_image_batches_list, all_label_batches_list = [], []
+        for _ in range(B):
+            random.shuffle(order_idx)
+            train_classes = random.sample(folders, N)
+            label_image_path_tups = get_images(train_classes, train_classes, K, False)
+            one_hot_mat = np.eye(N)
+            one_hot_dict = dict(zip(train_classes, one_hot_mat))
+            labels_str_list = [t[0] for t in label_image_path_tups]
+            labels_oh_array = np.vstack([one_hot_dict[l] for l in labels_str_list])
+            image_path_list = [t[1] for t in label_image_path_tups]
+            images_flat = np.vstack([image_file_to_array(f, self.dim_input) for f in image_path_list])
+            images_flat_re = images_flat.reshape([1, K, N, self.dim_input])
+            labels_oh_array_re = labels_oh_array.reshape([1, K, N, self.dim_output])
+            all_image_batches_list.append(images_flat_re[:, :, order_idx, :])
+            all_label_batches_list.append(labels_oh_array_re[:, :, order_idx, :])
 
-        all_image_batches = images_flat.reshape([B, K, N, self.dim_input])
-        all_label_batches = labels_oh_array.reshape([B, K, N, self.dim_output])
+        all_image_batches = np.vstack(all_image_batches_list)
+        all_label_batches = np.vstack(all_label_batches_list)
+        # pdb.set_trace()
 
         #############################
 

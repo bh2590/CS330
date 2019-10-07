@@ -29,7 +29,14 @@ def loss_function(preds, labels):
     """
     #############################
     #### YOUR CODE GOES HERE ####
-    pass
+    pdb.set_trace()
+    last_preds = preds[:, -1, :, :]
+    last_labels = labels[:, -1, :, :]
+    N = last_preds.get_shape().as_list()[-1]
+    last_preds_re = tf.reshape(last_preds, [-1, N])
+    last_labels_re = tf.reshape(last_labels, [-1, N])
+    loss = tf.losses.softmax_cross_entropy(last_labels_re, last_preds_re)
+    return loss
     #############################
 
 
@@ -61,7 +68,7 @@ class MANN(tf.keras.Model):
 
         concat_inputs = tf.concat([input_images, new_image_labels], axis=-1)
         _, K_1, N, D = concat_inputs.get_shape().as_list()
-        concat_inputs_reshaped = tf.reshape(input_images, [-1, K_1 * N, D])
+        concat_inputs_reshaped = tf.reshape(concat_inputs, [-1, K_1 * N, D])
         o1 = self.layer1(concat_inputs_reshaped)
         o2 = self.layer2(o1)
         out = tf.reshape(o2, [-1, K_1, N, N])
@@ -74,14 +81,14 @@ ims = tf.placeholder(tf.float32, shape=(
     None, FLAGS.num_samples + 1, FLAGS.num_classes, 784))
 labels = tf.placeholder(tf.float32, shape=(
     None, FLAGS.num_samples + 1, FLAGS.num_classes, FLAGS.num_classes))
-pdb.set_trace()
+# pdb.set_trace()
 data_generator = DataGenerator(
     FLAGS.num_classes, FLAGS.num_samples + 1)
-test = data_generator.sample_batch("train", 2)
-pdb.set_trace()
+# test = data_generator.sample_batch("train", 10)
 
 o = MANN(FLAGS.num_classes, FLAGS.num_samples + 1)
 out = o(ims, labels)
+# pdb.set_trace()
 
 loss = loss_function(out, labels)
 optim = tf.train.AdamOptimizer(0.001)
@@ -93,6 +100,7 @@ with tf.Session() as sess:
 
     for step in range(50000):
         i, l = data_generator.sample_batch('train', FLAGS.meta_batch_size)
+        # pdb.set_trace()
         feed = {ims: i.astype(np.float32), labels: l.astype(np.float32)}
         _, ls = sess.run([optimizer_step, loss], feed)
 
@@ -109,3 +117,5 @@ with tf.Session() as sess:
             pred = pred[:, -1, :, :].argmax(2)
             l = l[:, -1, :, :].argmax(2)
             print("Test Accuracy", (1.0 * (pred == l)).mean())
+
+pdb.set_trace()
