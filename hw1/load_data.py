@@ -74,6 +74,7 @@ class DataGenerator(object):
                              if os.path.isdir(os.path.join(data_folder, family, character))]
 
         random.seed(1)
+        np.random.seed(1)
         random.shuffle(character_folders)
         num_val = 100
         num_train = 1100
@@ -108,19 +109,14 @@ class DataGenerator(object):
         K = self.num_samples_per_class
         N = self.num_classes
 
-        order_idx = list(range(N))
         all_image_batches_list, all_label_batches_list = [], []
         for _ in range(B):
-            # random.shuffle(order_idx)
-            train_classes = random.sample(folders, N)
+            train_classes = np.random.choice(folders, N, replace=False)
+            # train_classes = random.sample(folders, N)
             label_image_path_tups = get_images(train_classes, np.eye(N), K, False)
             new_indices = [np.arange(i, N * K, K) for i in range(K)]
             for new_idx in new_indices:
                 np.random.shuffle(new_idx)
-            # pdb.set_trace()
-            # one_hot_mat = np.eye(N)
-            # one_hot_dict = dict(zip(train_classes, one_hot_mat))
-            # labels_str_list = [t[0] for t in label_image_path_tups]
             labels_oh_array = np.vstack([label_image_path_tups[i][0] for new_idx in new_indices for i in new_idx])
             image_path_list = [label_image_path_tups[i][1] for new_idx in new_indices for i in new_idx]
             images_flat = np.vstack([image_file_to_array(f, self.dim_input) for f in image_path_list])
@@ -131,8 +127,9 @@ class DataGenerator(object):
 
         all_image_batches = np.vstack(all_image_batches_list)
         all_label_batches = np.vstack(all_label_batches_list)
+        # print(all_label_batches)
         # pdb.set_trace()
-
+        # all_label_batches[:, -1, :, :] = 0.0
         #############################
 
         return all_image_batches, all_label_batches

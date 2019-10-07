@@ -37,7 +37,8 @@ def loss_function(preds, labels):
     N = last_preds.get_shape().as_list()[-1]
     last_preds_re = tf.reshape(last_preds, [-1, N])
     last_labels_re = tf.reshape(last_labels, [-1, N])
-    loss = tf.losses.softmax_cross_entropy(last_labels_re, last_preds_re)
+    loss = tf.losses.softmax_cross_entropy(onehot_labels=last_labels_re, logits=last_preds_re)
+    # loss = tf.losses.softmax_cross_entropy(labels[:, -1, :, :], preds[:, -1, :, :])
     return loss
     #############################
 
@@ -63,12 +64,23 @@ class MANN(tf.keras.Model):
         #############################
         #### YOUR CODE GOES HERE ####
         # pdb.set_trace()
-        label_list = tf.unstack(input_labels, axis=1)
-        last_labs = tf.zeros_like(label_list[-1])
-        label_list[-1] = last_labs
-        new_image_labels = tf.stack(label_list, axis=1)
+        # label_list = tf.unstack(input_labels, axis=1)
+        # last_labs = tf.zeros_like(label_list[-1])
+        # new_image_labels = tf.stack(label_list[:-1] + [last_labs], axis=1)
+        # concat_inputs = tf.concat([input_images, new_image_labels], axis=-1)
 
-        concat_inputs = tf.concat([input_images, new_image_labels], axis=-1)
+        # input_labels_3d = tf.reshape(input_labels, [-1, self.samples_per_class * self.num_classes, self.num_classes])
+        # label_mask = tf.sequence_mask(
+        #     (self.samples_per_class - 1) * self.num_classes * tf.ones([tf.shape(input_labels[0]), ]),
+        #     self.samples_per_class * self.num_classes)
+        # K = self.samples_per_class
+        # N = self.num_classes
+        # ones = tf.ones([tf.shape(input_labels)[0], K - 1, N], tf.float32)
+        # zeros = tf.zeros([tf.shape(input_labels)[0], 1, N], tf.float32)
+        # mask = tf.concat([ones, zeros], axis=1)
+        # masked_input_labels = input_labels * mask
+        # concat_inputs = tf.concat([input_images, masked_input_labels], axis=-1)
+        concat_inputs = tf.concat([input_images, input_labels], axis=-1)
         _, K_1, N, D = concat_inputs.get_shape().as_list()
         concat_inputs_reshaped = tf.reshape(concat_inputs, [-1, K_1 * N, D])
         o1 = self.layer1(concat_inputs_reshaped)
@@ -105,14 +117,17 @@ with tf.Session() as sess:
     for step in range(50000):
         i, l = data_generator.sample_batch('train', FLAGS.meta_batch_size)
         # pdb.set_trace()
-        feed = {ims: i.astype(np.float32), labels: l.astype(np.float32)}
+        l_mask = l.copy()
+        l_mask[:, :, -1, :] = 0.0
+        feed = {ims: i.astype(np.float32), labels: l_mask.astype(np.float32)}
         _, ls = sess.run([optimizer_step, loss], feed)
 
         if step % 100 == 0:
             print("*" * 5 + "Iter " + str(step) + "*" * 5)
             i, l = data_generator.sample_batch('test', 100)
-            feed = {ims: i.astype(np.float32),
-                    labels: l.astype(np.float32)}
+            l_mask = l.copy()
+            l_mask[:, :, -1, :] = 0.0
+            feed = {ims: i.astype(np.float32), labels: l_mask.astype(np.float32)}
             pred, tls = sess.run([out, loss], feed)
             print("Train Loss:", ls, "Test Loss:", tls)
             ddict['train_loss'].append(ls)
