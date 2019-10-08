@@ -74,7 +74,7 @@ class DataGenerator(object):
                              if os.path.isdir(os.path.join(data_folder, family, character))]
 
         random.seed(1)
-        np.random.seed(1)
+        # np.random.seed(1)
         random.shuffle(character_folders)
         num_val = 100
         num_train = 1100
@@ -104,29 +104,36 @@ class DataGenerator(object):
 
         #############################
         #### YOUR CODE GOES HERE ####
-        # pdb.set_trace()
         B = batch_size
         K = self.num_samples_per_class
         N = self.num_classes
 
         all_image_batches_list, all_label_batches_list = [], []
+        image_file_list = []
+        # pdb.set_trace()
         for _ in range(B):
-            train_classes = np.random.choice(folders, N, replace=False)
+            train_classes = np.random.choice(folders, size=N, replace=False)
+            assert len(set(train_classes)) == N, "class sampling error"
             # train_classes = random.sample(folders, N)
             label_image_path_tups = get_images(train_classes, np.eye(N), K, False)
             new_indices = [np.arange(i, N * K, K) for i in range(K)]
-            for new_idx in new_indices:
-                np.random.shuffle(new_idx)
-            labels_oh_array = np.vstack([label_image_path_tups[i][0] for new_idx in new_indices for i in new_idx])
-            image_path_list = [label_image_path_tups[i][1] for new_idx in new_indices for i in new_idx]
-            images_flat = np.vstack([image_file_to_array(f, self.dim_input) for f in image_path_list])
-            images_flat_re = images_flat.reshape([1, K, N, self.dim_input])
-            labels_oh_array_re = labels_oh_array.reshape([1, K, N, self.dim_output])
-            all_image_batches_list.append(images_flat_re)
-            all_label_batches_list.append(labels_oh_array_re)
-
-        all_image_batches = np.vstack(all_image_batches_list)
-        all_label_batches = np.vstack(all_label_batches_list)
+            # print("old", new_indices)
+            for i in range(K):
+                np.random.shuffle(new_indices[i])
+            # print("new", new_indices)
+            new_indices = np.array(new_indices).flatten()
+            labels_oh_array = np.vstack([label_image_path_tups[i][0] for i in new_indices])
+            # image_path_list = [label_image_path_tups[i][1] for i in new_indices]
+            images_flat = [image_file_to_array(label_image_path_tups[i][1], self.dim_input) for i in new_indices]
+            # images_flat1 = [image_file_to_array(f, self.dim_input) for f in image_path_list]
+            # images_flat_re = images_flat.reshape([1, K, N, self.dim_input])
+            # labels_oh_array_re = labels_oh_array.reshape([1, K, N, self.dim_output])
+            all_image_batches_list.append(images_flat)
+            all_label_batches_list.append(labels_oh_array)
+            # image_file_list.extend(image_path_list)
+        # pdb.set_trace()
+        all_image_batches = np.vstack(all_image_batches_list).reshape([B, K, N, self.dim_input])
+        all_label_batches = np.vstack(all_label_batches_list).reshape([B, K, N, self.dim_output])
         # print(all_label_batches)
         # pdb.set_trace()
         # all_label_batches[:, -1, :, :] = 0.0

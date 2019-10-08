@@ -79,7 +79,11 @@ class MANN(tf.keras.Model):
         # zeros = tf.zeros([tf.shape(input_labels)[0], 1, N], tf.float32)
         # mask = tf.concat([ones, zeros], axis=1)
         # masked_input_labels = input_labels * mask
+
+        # zeros_mask = tf.zeros_like(input_labels[:, -1:, :, :])  # [B, 1, N, N]
+        # masked_input_labels = tf.concat([input_labels[:, :-1, :, :], zeros_mask], axis=1)
         # concat_inputs = tf.concat([input_images, masked_input_labels], axis=-1)
+
         concat_inputs = tf.concat([input_images, input_labels], axis=-1)
         _, K_1, N, D = concat_inputs.get_shape().as_list()
         concat_inputs_reshaped = tf.reshape(concat_inputs, [-1, K_1 * N, D])
@@ -95,13 +99,15 @@ ims = tf.placeholder(tf.float32, shape=(
     None, FLAGS.num_samples + 1, FLAGS.num_classes, 784))
 labels = tf.placeholder(tf.float32, shape=(
     None, FLAGS.num_samples + 1, FLAGS.num_classes, FLAGS.num_classes))
+labels_mask = tf.placeholder(tf.float32, shape=(
+    None, FLAGS.num_samples + 1, FLAGS.num_classes, FLAGS.num_classes))
 # pdb.set_trace()
 data_generator = DataGenerator(
     FLAGS.num_classes, FLAGS.num_samples + 1)
 # test = data_generator.sample_batch("train", 10)
 
 o = MANN(FLAGS.num_classes, FLAGS.num_samples + 1)
-out = o(ims, labels)
+out = o(ims, labels_mask)
 # pdb.set_trace()
 
 loss = loss_function(out, labels)
@@ -118,16 +124,22 @@ with tf.Session() as sess:
         i, l = data_generator.sample_batch('train', FLAGS.meta_batch_size)
         # pdb.set_trace()
         l_mask = l.copy()
-        l_mask[:, :, -1, :] = 0.0
-        feed = {ims: i.astype(np.float32), labels: l_mask.astype(np.float32)}
+        l_mask[:, -1, :, :] = 0.0
+        feed = {ims: i.astype(np.float32),
+                labels: l.astype(np.float32),
+                labels_mask: l_mask.astype(np.float32),
+                }
         _, ls = sess.run([optimizer_step, loss], feed)
 
         if step % 100 == 0:
             print("*" * 5 + "Iter " + str(step) + "*" * 5)
             i, l = data_generator.sample_batch('test', 100)
             l_mask = l.copy()
-            l_mask[:, :, -1, :] = 0.0
-            feed = {ims: i.astype(np.float32), labels: l_mask.astype(np.float32)}
+            l_mask[:, -1, :, :] = 0.0
+            feed = {ims: i.astype(np.float32),
+                    labels: l.astype(np.float32),
+                    labels_mask: l_mask.astype(np.float32),
+                    }
             pred, tls = sess.run([out, loss], feed)
             print("Train Loss:", ls, "Test Loss:", tls)
             ddict['train_loss'].append(ls)
