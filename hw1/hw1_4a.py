@@ -16,12 +16,17 @@ flags.DEFINE_integer(
 flags.DEFINE_integer('num_samples', 1,
                      'number of examples used for inner gradient update (K for K-shot learning).')
 
-flags.DEFINE_integer('meta_batch_size', 16,
+flags.DEFINE_integer('meta_batch_size', 4,
                      'Number of N-way classification tasks per batch')
+
+flags.DEFINE_integer('nl', 1,
+                     'Number of lstm layers (excluding the last layer)')
 
 flags.DEFINE_float('lr', 0.0001, 'learning rate')
 
-flags.DEFINE_integer('num_steps', 500000, 'Number of steps')
+flags.DEFINE_integer('ns', 500000, 'Number of steps')
+
+flags.DEFINE_integer('hs', 128, 'lstm hidden size')
 
 
 def loss_function(preds, labels):
@@ -53,7 +58,8 @@ class MANN(tf.keras.Model):
         super(MANN, self).__init__()
         self.num_classes = num_classes
         self.samples_per_class = samples_per_class
-        self.layer1 = tf.keras.layers.LSTM(128, return_sequences=True)
+        self.layer_pipeline = [tf.keras.layers.LSTM(FLAGS.hs, return_sequences=True) for _ in range(FLAGS.nl)]
+        print(self.layer_pipeline)
         self.layer2 = tf.keras.layers.LSTM(num_classes, return_sequences=True)
 
     def call(self, input_images, input_labels):
@@ -79,9 +85,13 @@ class MANN(tf.keras.Model):
 
         concat_inputs = tf.concat([input_images, input_labels], axis=-1)
         _, K_1, N, D = concat_inputs.get_shape().as_list()
-        concat_inputs_reshaped = tf.reshape(concat_inputs, [-1, K_1 * N, D])
-        o1 = self.layer1(concat_inputs_reshaped)
+        o1 = tf.reshape(concat_inputs, [-1, K_1 * N, D])
+        # o1 = self.layer1(concat_inputs_reshaped)
+        # o1 = tf.identity(concat_inputs_reshaped)
+        for layer in self.layer_pipeline:
+            o1 = layer(o1)
         o2 = self.layer2(o1)
+        # o2 = self.layer2(concat_inputs_reshaped)
         out = tf.reshape(o2, [-1, K_1, N, N])
 
         #############################
@@ -107,15 +117,16 @@ loss = loss_function(out, labels)
 optim = tf.train.AdamOptimizer(FLAGS.lr)
 optimizer_step = optim.minimize(loss)
 ddict = defaultdict(list)
-outfile = "N_{}_K_{}_B_{}_lr_{}_NS_{}.csv".format(FLAGS.num_classes, FLAGS.num_samples, FLAGS.meta_batch_size,
-                                                  FLAGS.lr, FLAGS.num_steps)
+outfile = "N_{}_K_{}_B_{}_lr_{}_NS_{}_HS_{}_NL_{}.csv".format(FLAGS.num_classes, FLAGS.num_samples,
+                                                              FLAGS.meta_batch_size,
+                                                              FLAGS.lr, FLAGS.ns, FLAGS.hs, FLAGS.nl)
 
 try:
     with tf.Session() as sess:
         sess.run(tf.local_variables_initializer())
         sess.run(tf.global_variables_initializer())
 
-        for step in range(FLAGS.num_steps):
+        for step in range(FLAGS.ns):
             i, l = data_generator.sample_batch('train', FLAGS.meta_batch_size)
             # pdb.set_trace()
             l_mask = l.copy()
