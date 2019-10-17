@@ -69,12 +69,8 @@ def meta_train(model, saver, sess, exp_string, data_generator, resume_itr=0):
         # sample a batch of training data and partition into
         # group a (inputa, labela) and group b (inputb, labelb)
         all_image_batches, all_label_batches = data_generator.sample_batch("meta_train", FLAGS.meta_batch_size)
-        K = data_generator.num_samples_per_class
-        train_size = int(.8 * K)
-        sample_idx = np.random.permutation(K)
-        train_idx, test_idx = sample_idx[:train_size], sample_idx[train_idx:]
-        inputa, inputb = all_image_batches[:, :, train_idx, :], all_image_batches[:, :, test_idx, :]
-        labela, labelb = all_label_batches[:, :, train_idx, :], all_label_batches[:, :, test_idx, :]
+        inputa, inputb = all_image_batches[:, :, :FLAGS.k_shot, :], all_image_batches[:, :, FLAGS.k_shot:, :]
+        labela, labelb = all_label_batches[:, :, :FLAGS.k_shot, :], all_label_batches[:, :, FLAGS.k_shot:, :]
 
         # inputa, inputb, labela, labelb = None, None, None, None
         #############################
@@ -142,7 +138,9 @@ def meta_test(model, saver, sess, exp_string, data_generator, meta_test_num_inne
         # sample a batch of test data and partition into
         # group a (inputa, labela) and group b (inputb, labelb)
 
-        inputa, inputb, labela, labelb = None, None, None, None
+        all_image_batches, all_label_batches = data_generator.sample_batch("meta_test", FLAGS.meta_batch_size)
+        inputa, inputb = all_image_batches[:, :, :FLAGS.k_shot, :], all_image_batches[:, :, FLAGS.k_shot:, :]
+        labela, labelb = all_label_batches[:, :, :FLAGS.k_shot, :], all_label_batches[:, :, FLAGS.k_shot:, :]
         #############################
         feed_dict = {model.inputa: inputa, model.inputb: inputb, model.labela: labela, model.labelb: labelb,
                      model.meta_lr: 0.0}
