@@ -12,7 +12,7 @@ import pickle
 import random
 import tensorflow as tf
 import ipdb as pdb
-
+from ipdb import slaunch_ipdb_on_exception
 from load_data import DataGenerator
 from models.maml import MAML
 from tensorflow.python.platform import flags
@@ -36,7 +36,7 @@ flags.DEFINE_bool('learn_inner_update_lr', False, 'learn the per-layer update le
 ## Logging, saving, and testing options
 flags.DEFINE_string('data_path', './omniglot_resized', 'path to the dataset.')
 flags.DEFINE_bool('log', True, 'if false, do not log summaries, for debugging code.')
-flags.DEFINE_string('logdir', '/tmp/data', 'directory for summaries and checkpoints.')
+flags.DEFINE_string('logdir', 'logs', 'directory for summaries and checkpoints.')
 flags.DEFINE_bool('resume', False, 'resume training if there is a model available')
 flags.DEFINE_bool('meta_train', True, 'True to meta-train, False to meta-test.')
 flags.DEFINE_integer('meta_test_iter', -1, 'iteration to load model (-1 for latest model)')
@@ -105,8 +105,10 @@ def meta_train(model, saver, sess, exp_string, data_generator, resume_itr=0):
 
             # sample a batch of validation data and partition into
             # group a (inputa, labela) and group b (inputb, labelb)
-
-            inputa, inputb, labela, labelb = None, None, None, None
+            all_image_batches, all_label_batches = data_generator.sample_batch("meta_val", FLAGS.meta_batch_size)
+            inputa, inputb = all_image_batches[:, :, :FLAGS.k_shot, :], all_image_batches[:, :, FLAGS.k_shot:, :]
+            labela, labelb = all_label_batches[:, :, :FLAGS.k_shot, :], all_label_batches[:, :, FLAGS.k_shot:, :]
+            # inputa, inputb, labela, labelb = None, None, None, None
             #############################
             feed_dict = {model.inputa: inputa, model.inputb: inputb, model.labela: labela, model.labelb: labelb,
                          model.meta_lr: 0.0}
@@ -230,5 +232,8 @@ def main():
         meta_test(model, saver, sess, exp_string, data_generator, meta_test_num_inner_updates)
 
 
+pdb.set_trace = lambda: None
+
 if __name__ == "__main__":
-    main()
+    with slaunch_ipdb_on_exception():
+        main()

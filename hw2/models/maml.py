@@ -9,6 +9,22 @@ import ipdb as pdb
 FLAGS = flags.FLAGS
 
 
+# def my_accuracy(labels, logits):
+#     act_labels = tf.argmax(labels, axis=-1, output_type=tf.dtypes.int32)
+#     pred_labels = tf.argmax(logits, axis=-1, output_type=tf.dtypes.int32)
+#     acc = tf.reduce_mean(tf.to_float(tf.equal(act_labels, pred_labels)) / tf.to_float(tf.shape(act_labels)[0]))
+#     return acc
+
+
+def my_accuracy(labels, logits):
+    # act_labels = tf.argmax(labels, axis=-1, output_type=tf.dtypes.int32)
+    # pred_labels = tf.argmax(logits, axis=-1, output_type=tf.dtypes.int32)
+    act_labels = tf.argmax(labels)
+    pred_labels = tf.argmax(logits)
+    acc = tf.reduce_sum(tf.to_float(tf.equal(act_labels, pred_labels))) / tf.to_float(tf.shape(act_labels)[0])
+    return acc
+
+
 class MAML:
     def __init__(self, dim_input=1, dim_output=1, meta_test_num_inner_updates=5):
         """ must call construct_model() after initializing MAML! """
@@ -28,12 +44,18 @@ class MAML:
         pdb.set_trace()
         # a: group of data for calculating inner gradient
         # b: group of data for evaluating modified weights and computing meta gradient
+
+        # self.inputa = tf.placeholder(tf.float32, [FLAGS.meta_batch_size, FLAGS.n_way, FLAGS.k_shot, 784])
+        # self.inputb = tf.placeholder(tf.float32, [FLAGS.meta_batch_size, FLAGS.n_way, FLAGS.k_shot, 784])
+        # self.labela = tf.placeholder(tf.float32, [FLAGS.meta_batch_size, FLAGS.n_way, FLAGS.k_shot, FLAGS.n_way])
+        # self.labelb = tf.placeholder(tf.float32, [FLAGS.meta_batch_size, FLAGS.n_way, FLAGS.k_shot, FLAGS.n_way])
+        #
         self.inputa = tf.placeholder(tf.float32)
         self.inputb = tf.placeholder(tf.float32)
         self.labela = tf.placeholder(tf.float32)
         self.labelb = tf.placeholder(tf.float32)
 
-        with tf.variable_scope('model', reuse=None) as training_scope:
+        with tf.variable_scope('model', reuse=tf.AUTO_REUSE) as training_scope:
             # outputbs[i] and lossesb[i] are the output and loss after i+1 inner gradient updates
             lossesa, outputas, lossesb, outputbs = [], [], [], []
             accuraciesa, accuraciesb = [], []
@@ -82,21 +104,32 @@ class MAML:
                 task_outputbs, task_lossesb, task_accuraciesb = [], [], []
 
                 for i in range(num_inner_updates):
-                    task_outputa = self.forward(inputa, weights)
+                    if i == 0:
+                        weights1 = weights
+                    else:
+                        weights1 = task_weights
+                    task_outputa = self.forward(inputa, weights1)
                     task_lossa = self.loss_func(task_outputa, tf.reshape(labela, [-1, FLAGS.n_way]))
-                    grad_dict = dict()
-                    for name, var in weights.items():
-                        grad_dict[name] = tf.gradients(task_lossa, weights[name])[0]
-                    task_weights = dict()
-                    for name, var in weights.items():
-                        task_weights[name] = weights[name] - self.inner_update_lr * grad_dict[name]
+                    # task_accuracya, _ = tf.metrics.accuracy(labels=tf.argmax(tf.reshape(labela, [-1, FLAGS.n_way]), 1),
+                    #                                         predictions=tf.argmax(task_outputa, 1))
+                    task_accuracya = my_accuracy(tf.reshape(labela, [-1, FLAGS.n_way]), task_outputa)
 
-                    task_outb = self.forward(inputb, task_weights)
+                    grad_dict = dict()
+                    for name, var in weights1.items():
+                        grad_dict[name] = tf.gradients(task_lossa, weights1[name])[0]
+                    task_weights = dict()
+                    for name, var in weights1.items():
+                        task_weights[name] = weights1[name] - self.inner_update_lr * grad_dict[name]
+
+                    task_outb = self.forward(inputb, task_weights, True)
                     task_lossb = self.loss_func(task_outb, tf.reshape(labelb, [-1, FLAGS.n_way]))
+                    # task_accuracyb, _ = tf.metrics.accuracy(labels=tf.argmax(tf.reshape(labelb, [-1, FLAGS.n_way]), 1),
+                    #                                         predictions=tf.argmax(task_outb, 1))
+                    task_accuracyb = my_accuracy(tf.reshape(labelb, [-1, FLAGS.n_way]), task_outb)
 
                     task_outputbs.append(task_outb)
                     task_lossesb.append(task_lossb)
-                    task_accuraciesb.append(None)
+                    task_accuraciesb.append(task_accuracyb)
 
                 #############################
 

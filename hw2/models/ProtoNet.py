@@ -1,6 +1,17 @@
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers
+import ipdb as pdb
+
+
+def my_accuracy(labels, logits):
+    # act_labels = tf.argmax(labels, axis=-1, output_type=tf.dtypes.int32)
+    # pred_labels = tf.argmax(logits, axis=-1, output_type=tf.dtypes.int32)
+    act_labels = tf.argmax(labels)
+    pred_labels = tf.argmax(logits)
+    acc = tf.reduce_sum(tf.to_float(tf.equal(act_labels, pred_labels))) / tf.to_float(tf.shape(act_labels)[0])
+    return acc
+
 
 class ProtoNet(tf.keras.Model):
 
@@ -34,6 +45,7 @@ class ProtoNet(tf.keras.Model):
         out = self.flatten(out)
         return out
 
+
 def ProtoLoss(x_latent, q_latent, labels_onehot, num_classes, num_support, num_queries):
     """
         calculates the prototype network loss using the latent representation of x
@@ -51,17 +63,24 @@ def ProtoLoss(x_latent, q_latent, labels_onehot, num_classes, num_support, num_q
     """
     #############################
     #### YOUR CODE GOES HERE ####
+    pdb.set_trace()
 
     # compute the prototypes
+    ck = tf.reduce_mean(tf.reshape(x_latent, [num_classes, num_support, -1]), axis=1)
 
     # compute the distance from the prototypes
+    ck_norm = tf.nn.l2_normalize(ck, axis=1)
+    q_latent_norm = tf.nn.l2_normalize(q_latent, axis=1)
+    proto_cos_dists = 1 - tf.matmul(q_latent_norm, ck_norm, transpose_b=True)
+    proto_logits = -1 * proto_cos_dists
+    labels_re = tf.reshape(labels_onehot, [-1, num_classes])
 
     # compute cross entropy loss
-
+    ce_loss = tf.reduce_sum(tf.nn.softmax_cross_entropy_with_logits(labels=labels_re, logits=proto_logits))
+    acc = tf.contrib.metrics.accuracy(predictions=tf.argmax(proto_logits, 1), labels=tf.argmax(labels_re, 1))
     # note - additional steps are needed!
 
     # return the cross-entropy loss and accuracy
-    ce_loss, acc = None, None
+    # ce_loss, acc = None, None
     #############################
     return ce_loss, acc
-
