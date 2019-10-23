@@ -105,27 +105,33 @@ class MAML:
 
                 for i in range(num_inner_updates):
                     if i == 0:
-                        weights1 = weights
+                        weights_used = weights
                     else:
-                        weights1 = task_weights
-                    task_outputa = self.forward(inputa, weights1)
+                        weights_used = task_weights
+                    task_outputa = self.forward(inputa, weights_used)
                     task_lossa = self.loss_func(task_outputa, tf.reshape(labela, [-1, FLAGS.n_way]))
-                    # task_accuracya, _ = tf.metrics.accuracy(labels=tf.argmax(tf.reshape(labela, [-1, FLAGS.n_way]), 1),
-                    #                                         predictions=tf.argmax(task_outputa, 1))
-                    task_accuracya = my_accuracy(tf.reshape(labela, [-1, FLAGS.n_way]), task_outputa)
+                    # task_accuracya = my_accuracy(tf.reshape(labela, [-1, FLAGS.n_way]), task_outputa)
+                    task_accuracya = tf.contrib.metrics.accuracy(predictions=tf.argmax(task_outputa, -1),
+                                                                 labels=tf.argmax(tf.reshape(labela, [-1, FLAGS.n_way]),
+                                                                                  -1))
 
                     grad_dict = dict()
-                    for name, var in weights1.items():
-                        grad_dict[name] = tf.gradients(task_lossa, weights1[name])[0]
+                    for name, var in weights_used.items():
+                        grad_dict[name] = tf.gradients(task_lossa, weights_used[name])[0]
                     task_weights = dict()
-                    for name, var in weights1.items():
-                        task_weights[name] = weights1[name] - self.inner_update_lr * grad_dict[name]
+                    for name, var in weights_used.items():
+                        if FLAGS.learn_inner_update_lr:
+                            adaptive_lr = tf.Variable(self.inner_update_lr, True, name="lr_{}_{}".format(name, i))
+                            task_weights[name] = weights_used[name] - adaptive_lr * grad_dict[name]
+                        else:
+                            task_weights[name] = weights_used[name] - self.inner_update_lr * grad_dict[name]
 
                     task_outb = self.forward(inputb, task_weights, True)
                     task_lossb = self.loss_func(task_outb, tf.reshape(labelb, [-1, FLAGS.n_way]))
-                    # task_accuracyb, _ = tf.metrics.accuracy(labels=tf.argmax(tf.reshape(labelb, [-1, FLAGS.n_way]), 1),
-                    #                                         predictions=tf.argmax(task_outb, 1))
-                    task_accuracyb = my_accuracy(tf.reshape(labelb, [-1, FLAGS.n_way]), task_outb)
+                    # task_accuracyb = my_accuracy(tf.reshape(labelb, [-1, FLAGS.n_way]), task_outb)
+                    task_accuracyb = tf.contrib.metrics.accuracy(predictions=tf.argmax(task_outb, -1),
+                                                                 labels=tf.argmax(tf.reshape(labelb, [-1, FLAGS.n_way]),
+                                                                                  -1))
 
                     task_outputbs.append(task_outb)
                     task_lossesb.append(task_lossb)
