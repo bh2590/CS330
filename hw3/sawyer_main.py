@@ -23,6 +23,8 @@ from buffers import Buffer
 from matplotlib import pyplot as plt
 import multiworld
 import gym
+import random
+from scipy.spatial import distance
 
 multiworld.register_all_envs()  # register the multiworld environment
 
@@ -64,7 +66,7 @@ class Model(object):
         with tf.variable_scope(scope, reuse=reuse):
             # ======================== TODO modify code ========================
 
-            self.inp = tf.placeholder(shape=[None, NUM_DIM], dtype=tf.float32)
+            self.inp = tf.placeholder(shape=[None, 2 * NUM_DIM], dtype=tf.float32)
 
             # ========================      END TODO       ========================
 
@@ -166,12 +168,15 @@ def solve_environment(state, goal_state, total_reward):
 
         inp_state = state
         # forward pass to find action
+        inp_state = np.hstack((inp_state, goal_state))
         action = sess.run(model.predict, feed_dict={model.inp: [inp_state]})[0]
         # take the action - use helper function to convert discrete actions to
         # actions in the Sawyer environment
         next_state, reward, done, _ = take_action(action)
         # add to the episode experience (what happened)
-        episode_experience.append((state, action, reward, next_state, goal_state))
+        # episode_experience.append((state, action, reward, next_state, goal_state))
+        episode_experience.append((np.hstack((state, goal_state)), action, reward,
+                                   np.hstack((next_state, goal_state)), goal_state))
         # calculate total reward
         total_reward += reward
         # update state
@@ -186,6 +191,10 @@ def solve_environment(state, goal_state, total_reward):
         # ========================      END TODO       ========================
 
     return succeeded, episode_experience, total_reward
+
+
+def reward_fn(state_vector, goal_vector):
+    return -1 * distance.euclidean(state_vector, goal_vector)
 
 
 def update_replay_buffer(episode_experience, HER):
@@ -218,18 +227,38 @@ def update_replay_buffer(episode_experience, HER):
 
         elif HER == 'final':
             # final - relabel based on final state in episode
-            pass
+            new_goal_vector = np.copy(episode_experience[-1][0][:NUM_DIM])
+            state = np.copy(inputs[0][:NUM_DIM])
+            new_state = np.copy(inputs_[:NUM_DIM])
+            full_state = np.hstack((state, new_goal_vector)),
+            full_new_state = np.hstack((new_state, new_goal_vector))
+            new_r = 0
+            replay_buffer.add(full_state, a, new_r, full_new_state)
 
         elif HER == 'future':
             # future - relabel based on future state. At each timestep t, relabel the
             # goal with a randomly select timestep between t and the end of the
             # episode
-            pass
+            new_goal_vector = random.sample(episode_experience, 1)[0][3]
+            for i in range(num_relabeled):
+                sample_episode = random.sample(episode_experience, 1)[0]
+                state, action, new_state = sample_episode[0], sample_episode[1], sample_episode[2]
+                new_r = reward_fn(state, new_goal_vector)
+                full_state = np.hstack((state, new_goal_vector)),
+                full_new_state = np.hstack((new_state, new_goal_vector))
+                replay_buffer.add(full_state, action, new_r, full_new_state)
 
 
         elif HER == 'random':
             # random - relabel based on a random state in the episode
-            pass
+            new_goal_vector = random.sample(episode_experience, 1)[0][0]
+            for i in range(num_relabeled):
+                sample_episode = random.sample(episode_experience, 1)[0]
+                state, action, new_state = sample_episode[0], sample_episode[1], sample_episode[3]
+                new_r = reward_fn(state, new_goal_vector)
+                full_state = np.hstack((state, new_goal_vector)),
+                full_new_state = np.hstack((new_state, new_goal_vector))
+                replay_buffer.add(full_state, action, new_r, full_new_state)
 
         # ========================      END TODO       ========================
 
@@ -255,6 +284,7 @@ def plot_success_rate(success_rates, labels):
     plt.ylim(0, 1)
     plt.legend()
     plt.show()
+    plt.savefig("bits_main_SPE_{}_NE_{}_HER_{}.png".format(FLAGS.steps_per_episode, FLAGS.num_epochs, FLAGS.HER))
 
     return
 
@@ -316,7 +346,7 @@ def run_sawyer(HER="None"):
 
         if i % FLAGS.log_interval == 0:
             print('Epoch: %d  Cumulative reward: %f  Success rate: %.4f Mean loss: %.4f' % (
-            i, total_reward, np.mean(successes), np.mean(losses)))
+                i, total_reward, np.mean(successes), np.mean(losses)))
 
     return success_rate
 

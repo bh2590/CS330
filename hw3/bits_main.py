@@ -215,10 +215,10 @@ def update_replay_buffer(episode_experience, HER):
             # future - relabel based on future state. At each timestep t, relabel the
             # goal with a randomly select timestep between t and the end of the
             # episode
-            new_goal_vector = random.sample(episode_experience, 1)[0][3]
+            new_goal_vector = random.sample(episode_experience, 1)[0][3][num_bits:]
             for i in range(num_relabeled):
                 sample_episode = random.sample(episode_experience, 1)[0]
-                state, action, new_state = sample_episode[0], sample_episode[1], sample_episode[2]
+                state, action, new_state = sample_episode[0][num_bits:], sample_episode[1], sample_episode[3][num_bits:]
                 new_r = reward_fn(state, new_goal_vector, action)
                 full_state = np.hstack((state, new_goal_vector)),
                 full_new_state = np.hstack((new_state, new_goal_vector))
@@ -227,10 +227,10 @@ def update_replay_buffer(episode_experience, HER):
 
         elif HER == 'random':
             # random - relabel based on a random state in the episode
-            new_goal_vector = random.sample(episode_experience, 1)[0][0]
+            new_goal_vector = random.sample(episode_experience, 1)[0][0][num_bits:]
             for i in range(num_relabeled):
                 sample_episode = random.sample(episode_experience, 1)[0]
-                state, action, new_state = sample_episode[0], sample_episode[1], sample_episode[3]
+                state, action, new_state = sample_episode[0][num_bits:], sample_episode[1], sample_episode[3][num_bits:]
                 new_r = reward_fn(state, new_goal_vector, action)
                 full_state = np.hstack((state, new_goal_vector)),
                 full_new_state = np.hstack((new_state, new_goal_vector))
@@ -260,6 +260,7 @@ def plot_success_rate(success_rates, labels):
     plt.ylim(0, 1)
     plt.legend()
     plt.show()
+    plt.savefig("bits_main_NB_{}_NE_{}_HER_{}.png".format(FLAGS.num_bits, FLAGS.num_epochs, FLAGS.HER))
 
     return
 
