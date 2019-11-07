@@ -213,7 +213,7 @@ def update_replay_buffer(episode_experience, HER):
 
         s, a, r, s_, g = episode_experience[t]
         # state
-        inputs = s
+        inputs = s,
         # next state
         inputs_ = s_
         # add to the replay buffer
@@ -227,38 +227,39 @@ def update_replay_buffer(episode_experience, HER):
 
         elif HER == 'final':
             # final - relabel based on final state in episode
-            new_goal_vector = np.copy(episode_experience[-1][0][:NUM_DIM])
+            new_goal_vector = np.copy(episode_experience[-1][3][:NUM_DIM])
             state = np.copy(inputs[0][:NUM_DIM])
             new_state = np.copy(inputs_[:NUM_DIM])
             full_state = np.hstack((state, new_goal_vector)),
             full_new_state = np.hstack((new_state, new_goal_vector))
-            new_r = 0
+            new_r = reward_fn(new_state, new_goal_vector)
             replay_buffer.add(full_state, a, new_r, full_new_state)
 
         elif HER == 'future':
             # future - relabel based on future state. At each timestep t, relabel the
             # goal with a randomly select timestep between t and the end of the
             # episode
-            new_goal_vector = random.sample(episode_experience, 1)[0][3]
+            if t + 1 == NUM_DIM:
+                continue
             for i in range(num_relabeled):
-                sample_episode = random.sample(episode_experience, 1)[0]
-                state, action, new_state = sample_episode[0], sample_episode[1], sample_episode[2]
-                new_r = reward_fn(state, new_goal_vector)
+                new_goal_vector = random.sample(episode_experience[t + 1:], 1)[0][3][:NUM_DIM]
+                state = np.copy(inputs[0][:NUM_DIM])
+                new_state = np.copy(inputs_[:NUM_DIM])
                 full_state = np.hstack((state, new_goal_vector)),
                 full_new_state = np.hstack((new_state, new_goal_vector))
-                replay_buffer.add(full_state, action, new_r, full_new_state)
-
+                new_r = reward_fn(new_state, new_goal_vector)
+                replay_buffer.add(full_state, a, new_r, full_new_state)
 
         elif HER == 'random':
             # random - relabel based on a random state in the episode
-            new_goal_vector = random.sample(episode_experience, 1)[0][0]
             for i in range(num_relabeled):
-                sample_episode = random.sample(episode_experience, 1)[0]
-                state, action, new_state = sample_episode[0], sample_episode[1], sample_episode[3]
-                new_r = reward_fn(state, new_goal_vector)
+                new_goal_vector = random.sample(episode_experience, 1)[0][3][:NUM_DIM]
+                state = np.copy(inputs[0][:NUM_DIM])
+                new_state = np.copy(inputs_[:NUM_DIM])
                 full_state = np.hstack((state, new_goal_vector)),
                 full_new_state = np.hstack((new_state, new_goal_vector))
-                replay_buffer.add(full_state, action, new_r, full_new_state)
+                new_r = reward_fn(new_state, new_goal_vector)
+                replay_buffer.add(full_state, a, new_r, full_new_state)
 
         # ========================      END TODO       ========================
 
