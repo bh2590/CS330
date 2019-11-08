@@ -24,9 +24,9 @@ from matplotlib import pyplot as plt
 import multiworld
 import gym
 import random
-# from scipy.spatial import distance
-# import ipdb as pdb
-# from ipdb import slaunch_ipdb_on_exception
+from scipy.spatial import distance
+import ipdb as pdb
+from ipdb import slaunch_ipdb_on_exception
 
 multiworld.register_all_envs()  # register the multiworld environment
 
@@ -176,9 +176,9 @@ def solve_environment(state, goal_state, total_reward):
         # actions in the Sawyer environment
         next_state, reward, done, _ = take_action(action)
         # add to the episode experience (what happened)
-        # episode_experience.append((state, action, reward, next_state, goal_state))
-        episode_experience.append((np.concatenate((state, goal_state)), action, reward,
-                                   np.concatenate((next_state, goal_state)), goal_state))
+        episode_experience.append((state, action, reward, next_state, goal_state))
+        # episode_experience.append((np.concatenate((state, goal_state)), action, reward,
+        #                            np.concatenate((next_state, goal_state)), goal_state))
         # calculate total reward
         total_reward += reward
         # update state
@@ -197,6 +197,7 @@ def solve_environment(state, goal_state, total_reward):
 
 def reward_fn(state_vector, goal_vector):
     return -np.sqrt(np.sum(np.square(state_vector - goal_vector)))
+    # return -1 * distance.euclidean(state_vector, goal_vector)
 
 
 def update_replay_buffer(episode_experience, HER):
@@ -215,9 +216,9 @@ def update_replay_buffer(episode_experience, HER):
 
         s, a, r, s_, g = episode_experience[t]
         # state
-        inputs = s,
+        inputs = np.concatenate([s, g])
         # next state
-        inputs_ = s_
+        inputs_ = np.concatenate([s_, g])
         # add to the replay buffer
         replay_buffer.add(inputs, a, r, inputs_)
 
@@ -230,12 +231,12 @@ def update_replay_buffer(episode_experience, HER):
         elif HER == 'final':
             # final - relabel based on final state in episode
             # pdb.set_trace()
-            new_goal_vector = episode_experience[-1][3][:NUM_DIM]
-            state = inputs[0][:NUM_DIM]
-            new_state = inputs_[:NUM_DIM]
-            full_state = np.concatenate((state, new_goal_vector)),
-            full_new_state = np.concatenate((new_state, new_goal_vector))
-            new_r = reward_fn(new_state, new_goal_vector)
+            new_goal_vector = episode_experience[-1][3]
+            # state = inputs[:NUM_DIM]
+            # new_state = inputs_[:NUM_DIM]
+            full_state = np.concatenate((s, new_goal_vector))
+            full_new_state = np.concatenate((s_, new_goal_vector))
+            new_r = reward_fn(s_, new_goal_vector)
             replay_buffer.add(full_state, a, new_r, full_new_state)
 
         elif HER == 'future':
@@ -357,6 +358,7 @@ def run_sawyer(HER="None"):
 
 
 if __name__ == "__main__":
-    success_rate = run_sawyer(HER=FLAGS.HER)  # run training loop without HER
-    # pass success rate for each run as first argument and labels as second list
-    plot_success_rate([success_rate], [FLAGS.HER])
+    with slaunch_ipdb_on_exception():
+        success_rate = run_sawyer(HER=FLAGS.HER)  # run training loop without HER
+        # pass success rate for each run as first argument and labels as second list
+        plot_success_rate([success_rate], [FLAGS.HER])
