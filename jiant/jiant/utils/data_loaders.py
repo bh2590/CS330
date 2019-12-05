@@ -135,7 +135,7 @@ def load_tsv(
     # TODO(Yada): Instead of index integers, adjust this to pass in column names
     # get the first row as the columns to pass into the pandas reader
     # This reads the data file given the delimiter, skipping over any rows
-    # (usually header row)
+    # (usually header row
     rows = pd.read_csv(
         data_file,
         sep=delimiter,

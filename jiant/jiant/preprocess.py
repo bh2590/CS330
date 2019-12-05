@@ -53,6 +53,7 @@ from jiant.tasks import REGISTRY as TASKS_REGISTRY
 from jiant.tasks.seq2seq import Seq2SeqTask
 from jiant.tasks.tasks import SequenceGenerationTask
 from jiant.utils import config, serialize, utils
+import ipdb as pdb
 
 # NOTE: these are not that same as AllenNLP SOS, EOS tokens
 SOS_TOK, EOS_TOK = "<SOS>", "<EOS>"
@@ -167,7 +168,7 @@ def _index_split(task, split, indexers, vocab, record_file, model_preprocessing_
 
 
 def _find_cached_file(
-    exp_dir: str, global_exp_cache_dir: str, relative_path: str, log_prefix: str = ""
+        exp_dir: str, global_exp_cache_dir: str, relative_path: str, log_prefix: str = ""
 ) -> bool:
     """Find a cached file.
 
@@ -211,7 +212,7 @@ def _build_embeddings(args, vocab, emb_file: str):
 
     if args.word_embs_file:
         with io.open(
-            args.word_embs_file, "r", encoding="utf-8", newline="\n", errors="ignore"
+                args.word_embs_file, "r", encoding="utf-8", newline="\n", errors="ignore"
         ) as vec_fh:
             for line in vec_fh:
                 word, vec = line.split(" ", 1)
@@ -290,6 +291,7 @@ def build_tasks(args):
     4) indexing each task's data
     5) initializing lazy loaders (streaming iterators)
     """
+    pdb.set_trace()
 
     # 1) create / load tasks
     tasks, pretrain_task_names, target_task_names = get_tasks(args)
@@ -371,6 +373,7 @@ def build_tasks(args):
     # 6) Initialize tasks with data iterators.
     pretrain_tasks = []
     target_tasks = []
+    pdb.set_trace()
     for task in tasks:
         # Replace lists of instances with lazy generators from disk.
         task.val_data = _get_instance_generator(task.name, "val", preproc_dir)
@@ -480,6 +483,42 @@ def get_tasks(args):
         task = _get_task(name, args, data_path=data_path, scratch_path=scratch_path)
         tasks.append(task)
 
+    if int(args.downsample_large_tasks) == 1:
+        import random
+        import ast
+        from copy import deepcopy
+        # task_sizes = [float(s) if float(s) <= 1. else int(s) for s in args.pretrain_tasks_size.split(",")]
+        pretrain_tasks_size_dict = ast.literal_eval(args.pretrain_tasks_size_dict)
+        assert len(pretrain_tasks_size_dict) == len(tasks), "Downsample dict and task length differ!"
+        for i, task in enumerate(tasks):
+            random.seed(args.random_seed)
+            pdb.set_trace()
+            downsampled_task_size = pretrain_tasks_size_dict[task.name]
+            task.count_examples()
+            training_size = task.n_train_examples
+            downsample_this_task = True
+            if downsampled_task_size == 1.:
+                task_samples = training_size
+                downsample_this_task = False
+            elif downsampled_task_size < 1.:
+                task_samples = min(int(downsampled_task_size * training_size) + 1, training_size)
+            else:
+                task_samples = min(int(downsampled_task_size), training_size)
+
+            if downsample_this_task:
+                log.info("Downsampling task:{} to {} samples".format(task.name, task_samples))
+                if len(task.train_data_text) == training_size:
+                    task.train_data_text = random.sample(task.train_data_text, task_samples)
+                else:
+                    sample_indices = random.sample(list(range(training_size)), task_samples)
+                    tmp_list = list()
+                    for i, elem in enumerate(task.train_data_text):
+                        elem_downsampled = deepcopy([elem[j] for j in sample_indices])
+                        tmp_list.append(elem_downsampled)
+                    task.train_data_text = tuple(tmp_list)
+                task.count_examples()  # to reset var names like n_train_examples
+
+    for task in tasks:
         # Count examples, store in example_counts.
         if task.example_counts is None:
             task.count_examples()
@@ -607,9 +646,9 @@ def add_pytorch_transformers_vocab(vocab, tokenizer_name):
         tokenizer = XLMTokenizer.from_pretrained(tokenizer_name)
 
     if (
-        tokenizer_name.startswith("openai-gpt")
-        or tokenizer_name.startswith("gpt2")
-        or tokenizer_name.startswith("transo-xl-")
+            tokenizer_name.startswith("openai-gpt")
+            or tokenizer_name.startswith("gpt2")
+            or tokenizer_name.startswith("transo-xl-")
     ):
         tokenizer.add_special_tokens(
             {"bos_token": "<start>", "sep_token": "<delim>", "cls_token": "<extract>"}

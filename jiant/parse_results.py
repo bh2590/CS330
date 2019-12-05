@@ -10,14 +10,14 @@ MAX_SIMUL_TASK_COUNT = 2
 TASK_ORDER = ['mnli', 'qqp', 'qnli', 'rte', 'sts-b', 'cola', 'sst', 'mrpc']
 
 task_to_evalmetric = {
-    'mnli': 'acc',
-    'qqp': 'acc',
-    'qnli': 'acc',
-    'rte': 'acc',
-    'sts-b': 'spearmanr',
-    'cola': 'mcc',
-    'sst': 'acc',
-    'mrpc': 'acc',
+    'mnli': 'mnli_accuracy',
+    'qqp': 'qqp_acc_f1',
+    'qnli': 'qnli_accuracy',
+    'rte': 'rte_accuracy',
+    'sts-b': 'sts-b_corr',
+    'cola': 'cola_mcc',
+    'sst': 'sst_accuracy',
+    'mrpc': 'mrpc_acc_f1',
 }
 
 

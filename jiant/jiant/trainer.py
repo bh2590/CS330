@@ -31,7 +31,7 @@ from jiant.utils.utils import (
     find_last_checkpoint_epoch,
     check_for_previous_checkpoints,
 )  # pylint: disable=import-error
-
+import ipdb as pdb
 
 def build_trainer_params(args, task_names, phase="pretrain"):
     """ Helper function which extracts trainer parameters from args.
@@ -49,6 +49,7 @@ def build_trainer_params(args, task_names, phase="pretrain"):
             assert len(task_names) == 1
             return config.get_task_attr(args, task_names[0], attr_name, default)
 
+    pdb.set_trace()
     params = {}
     train_opts = [
         "optimizer",
@@ -550,6 +551,7 @@ class SamplingMultiTaskTrainer:
         task_names = [task.name for task in tasks]
         task_n_train_examples = np.array([task.n_train_examples for task in tasks])
         task_n_train_batches = np.array([task_infos[task.name]["n_tr_batches"] for task in tasks])
+        pdb.set_trace()
         log.info(
             "Training examples per task, before any subsampling: "
             + str(dict(zip(task_names, task_n_train_examples)))
